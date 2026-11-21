@@ -1,0 +1,20 @@
+{
+  "name": "${localWorkspaceFolderBasename}",
+  "build": { "dockerfile": "Dockerfile", "context": ".." },
+  "remoteUser": "vscode",
+  "runArgs": ["--add-host=host.docker.internal:host-gateway"],
+  "mounts": [
+    // Shared by every dc project: log in to Claude once, in any container.
+    "source=dc-claude-config,target=/home/vscode/.claude,type=volume",
+    // Shared by every dc project: GitHub token written by `dc github-login` (read-only here).
+    "source=dc-git-credentials,target=/dc-git,type=volume,readonly",
+    // Cameron's knowledge vault (Obsidian), shared read-write by every dc project.
+    "source=C:/Users/Cameron/Projects/obsidian,target=/vault,type=bind"
+  ],
+  "containerEnv": {
+    "GIT_CONFIG_COUNT": "1",
+    "GIT_CONFIG_KEY_0": "credential.https://github.com.helper",
+    "GIT_CONFIG_VALUE_0": "!f() { test \"$1\" != get || git credential-store --file=/dc-git/credentials get; }; f"
+  },
+  "customizations": { "vscode": { "extensions": ["anthropic.claude-code"] } }
+}

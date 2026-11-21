@@ -453,7 +453,7 @@ const isSaved = (it) => it.source === "phone" || saved.get(it.name)?.size === it
 const xml = (s) => new DOMParser().parseFromString(s, "text/xml");
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
 
-// ---- camera protocol (see ../PROTOCOL.md)
+// ---- camera protocol (see lumix-lux-core docs/protocols/panasonic-camcgi.md)
 async function httpGet(url, timeout = 4000) {
   const r = await Native.httpGet({ url, timeout });
   if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
