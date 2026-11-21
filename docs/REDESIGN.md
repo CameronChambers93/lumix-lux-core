@@ -175,3 +175,15 @@ or the address is typed), or with the share sheet (email, Drive) when the PC isn
 ## Progress log
 
 (append here)
+
+### Phase 0: repos (2026-11-21)
+
+- Split with `git filter-repo` from `lumix-zs100-controller` (history kept): core (protocol doc, drivers draft, fakecam,
+  shared page `ui/index.html`, this plan), android (`mobile/` flattened to the root, `mobile/tools/` → `tools/`, `PLAN.md` →
+  `docs/PLAN-v2.md`, README media), windows (`app/`, `pc/`), ios (stub: README, CLAUDE.md). Each app repo has `core/` as a
+  submodule; each has its own README, CLAUDE.md, `.gitattributes` (LF, `.bat` CRLF) and dev container (Android keeps the SDK
+  toolchain and Gradle volume; Windows is Python only, `postCreateCommand` inits the submodule).
+- Windows: release zip copies the protocol doc from `core/`; `/lumix.apk` reads `$LUMIX_APK` (the APK is built in the
+  Android repo). Checked: `test_exif.py`, server smoke test (page, status, items, apk), `pc/release.sh` zip contents.
+- Not done yet: push (the `dc` token gets 403 on all four repos), the archive notice in `lumix-zs100-controller`, new dc
+  projects/containers for the three app repos (Cameron, on the host).
