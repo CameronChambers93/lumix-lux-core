@@ -1,0 +1,52 @@
+[
+ {
+  "name": "device description",
+  "fn": "parseDeviceInfo",
+  "driver": "panasonic-zs100",
+  "args": [
+   "<?xml version=\"1.0\"?><root xmlns=\"urn:schemas-upnp-org:device-1-0\" xmlns:pana=\"urn:schemas-panasonic-com:pana\"><specVersion><major>1</major><minor>0</minor></specVersion><device><deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType><friendlyName>ZS100-248B00</friendlyName><manufacturer>Panasonic</manufacturer><modelName>LUMIX</modelName><modelNumber>DMC-ZS100</modelNumber><UDN>uuid:4D454930-0100-1000-8001-A0CC2B248B00</UDN><pana:X_FirmVersion>1.20</pana:X_FirmVersion><pana:X_AdditionalFunction>CPRemoteView</pana:X_AdditionalFunction><serviceList><service><serviceType>urn:schemas-upnp-org:service:ConnectionManager:1</serviceType><serviceId>urn:upnp-org:serviceId:ConnectionManager</serviceId><controlURL>/Server0/CMR_control</controlURL></service><service><serviceType>urn:schemas-upnp-org:service:ContentDirectory:1</serviceType><serviceId>urn:upnp-org:serviceId:ContentDirectory</serviceId><controlURL>/Server0/CDS_control</controlURL></service></serviceList></device></root>"
+  ],
+  "expect": {
+   "name": "ZS100-248B00",
+   "model": "DMC-ZS100",
+   "firmware": "1.20",
+   "manufacturer": "Panasonic"
+  }
+ },
+ {
+  "name": "ContentDirectory control URL",
+  "fn": "parseCdsControl",
+  "driver": "panasonic-zs100",
+  "args": [
+   "<?xml version=\"1.0\"?><root xmlns=\"urn:schemas-upnp-org:device-1-0\" xmlns:pana=\"urn:schemas-panasonic-com:pana\"><specVersion><major>1</major><minor>0</minor></specVersion><device><deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType><friendlyName>ZS100-248B00</friendlyName><manufacturer>Panasonic</manufacturer><modelName>LUMIX</modelName><modelNumber>DMC-ZS100</modelNumber><UDN>uuid:4D454930-0100-1000-8001-A0CC2B248B00</UDN><pana:X_FirmVersion>1.20</pana:X_FirmVersion><pana:X_AdditionalFunction>CPRemoteView</pana:X_AdditionalFunction><serviceList><service><serviceType>urn:schemas-upnp-org:service:ConnectionManager:1</serviceType><serviceId>urn:upnp-org:serviceId:ConnectionManager</serviceId><controlURL>/Server0/CMR_control</controlURL></service><service><serviceType>urn:schemas-upnp-org:service:ContentDirectory:1</serviceType><serviceId>urn:upnp-org:serviceId:ContentDirectory</serviceId><controlURL>/Server0/CDS_control</controlURL></service></serviceList></device></root>",
+   "http://10.0.0.220:60606/A0CC2B248B00/Server0/ddd"
+  ],
+  "expect": "http://10.0.0.220:60606/Server0/CDS_control"
+ },
+ {
+  "name": "SSDP reply from the ZS100",
+  "fn": "parseSsdp",
+  "driver": "panasonic-zs100",
+  "args": [
+   "HTTP/1.1 200 OK\r\nCACHE-CONTROL: max-age=1800\r\nDATE: Mon, 13 Feb 2012 00:00:00 GMT\r\nEXT:\r\nLOCATION: http://10.0.0.220:60606/A0CC2B248B00/Server0/ddd\r\nSERVER: Linux/4.0 UPnP/1.0 Panasonic-UPnP-MW/1.0\r\nST: urn:schemas-upnp-org:device:MediaServer:1\r\nUSN: uuid:4D454930-0100-1000-8001-A0CC2B248B00::urn:schemas-upnp-org:device:MediaServer:1\r\n\r\n"
+  ],
+  "expect": {
+   "location": "http://10.0.0.220:60606/A0CC2B248B00/Server0/ddd",
+   "server": "Linux/4.0 UPnP/1.0 Panasonic-UPnP-MW/1.0",
+   "ip": "10.0.0.220",
+   "matches": true
+  }
+ },
+ {
+  "name": "SSDP reply from a router",
+  "fn": "parseSsdp",
+  "driver": "panasonic-zs100",
+  "args": [
+   "HTTP/1.1 200 OK\r\nLOCATION: http://10.0.0.1:5000/rootDesc.xml\r\nSERVER: OpenWRT/21 UPnP/1.1 MiniUPnPd/2.2\r\n\r\n"
+  ],
+  "expect": {
+   "ip": "10.0.0.1",
+   "matches": false
+  }
+ }
+]

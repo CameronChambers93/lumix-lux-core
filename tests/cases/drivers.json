@@ -1,0 +1,199 @@
+[
+ {
+  "name": "zs100 inherits the family base",
+  "fn": "resolveDriver",
+  "args": [
+   "panasonic-zs100"
+  ],
+  "expect": {
+   "id": "panasonic-zs100",
+   "protocol": "panasonic-camcgi",
+   "abstract": false,
+   "chain": [
+    "panasonic-zs100",
+    "panasonic-camcgi"
+   ],
+   "features": {
+    "remote": true,
+    "liveView": true,
+    "touchFocus": true,
+    "zoom": "normal"
+   },
+   "control": {
+    "port": 80,
+    "path": "/cam.cgi",
+    "settleMs": 2000
+   },
+   "media": {
+    "dateHeader": "X-REC_DATE_TIME",
+    "slots": 2
+   },
+   "hotspot": {
+    "ip": "192.168.54.1"
+   }
+  }
+ },
+ {
+  "name": "a model file overrides one nested key",
+  "fn": "resolveDriver",
+  "args": [
+   "x-test",
+   {
+    "x-test": {
+     "id": "x-test",
+     "schema": 1,
+     "version": 1,
+     "name": "T",
+     "extends": "panasonic-camcgi",
+     "control": {
+      "settleMs": 500
+     }
+    }
+   }
+  ],
+  "expect": {
+   "control": {
+    "settleMs": 500,
+    "port": 80,
+    "path": "/cam.cgi"
+   },
+   "features": {
+    "remote": false
+   }
+  }
+ },
+ {
+  "name": "an unknown protocol needs an app update",
+  "fn": "resolveDriver",
+  "args": [
+   "x-new",
+   {
+    "x-new": {
+     "id": "x-new",
+     "schema": 1,
+     "version": 1,
+     "name": "T",
+     "protocol": "ptp-ip"
+    }
+   }
+  ],
+  "throws": "app needs an update"
+ },
+ {
+  "name": "a newer schema is refused",
+  "fn": "resolveDriver",
+  "args": [
+   "x-new",
+   {
+    "x-new": {
+     "id": "x-new",
+     "schema": 2,
+     "version": 1,
+     "name": "T",
+     "extends": "panasonic-camcgi"
+    }
+   }
+  ],
+  "throws": "schema 2"
+ },
+ {
+  "name": "match by capability model",
+  "fn": "matchDriver",
+  "args": [
+   {
+    "capabilityModel": "TZ100"
+   }
+  ],
+  "expect": {
+   "matched": true,
+   "by": "capabilityModel",
+   "driver": {
+    "id": "panasonic-zs100"
+   }
+  }
+ },
+ {
+  "name": "match by UPnP model number",
+  "fn": "matchDriver",
+  "args": [
+   {
+    "modelNumber": "DMC-TZ101",
+    "friendlyName": "TZ101-123456"
+   }
+  ],
+  "expect": {
+   "matched": true,
+   "by": "modelNumber",
+   "driver": {
+    "id": "panasonic-zs100"
+   }
+  }
+ },
+ {
+  "name": "an unknown camera gets the cautious base",
+  "fn": "matchDriver",
+  "args": [
+   {
+    "modelNumber": "DC-GH5",
+    "capabilityModel": "GH5"
+   }
+  ],
+  "expect": {
+   "matched": false,
+   "by": null,
+   "driver": {
+    "id": "panasonic-camcgi",
+    "abstract": true,
+    "features": {
+     "remote": false,
+     "liveView": false
+    }
+   }
+  }
+ },
+ {
+  "name": "both shipped drivers are valid",
+  "fn": "validateAll",
+  "args": [],
+  "expect": {}
+ },
+ {
+  "name": "a typo is caught",
+  "fn": "validate",
+  "args": [
+   {
+    "id": "x",
+    "schema": 1,
+    "version": 1,
+    "name": "X",
+    "contrl": {},
+    "features": {
+     "zoom": "fast"
+    }
+   }
+  ],
+  "expect": [
+   "$: unknown key \"contrl\"",
+   "$.features.zoom: should be one of [\"none\",\"normal\"]"
+  ]
+ },
+ {
+  "name": "missing keys and bad types",
+  "fn": "validate",
+  "args": [
+   {
+    "id": "Bad Id",
+    "schema": 1,
+    "control": {
+     "port": "80"
+    }
+   }
+  ],
+  "expect": [
+   "$: missing \"version\"",
+   "$: missing \"name\"",
+   "$.id: doesn't match ^[a-z0-9]+(-[a-z0-9]+)*$",
+   "$.control.port: should be integer"
+  ]
+ }
+]

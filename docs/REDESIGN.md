@@ -187,3 +187,17 @@ or the address is typed), or with the share sheet (email, Drive) when the PC isn
   Android repo). Checked: `test_exif.py`, server smoke test (page, status, items, apk), `pc/release.sh` zip contents.
 - Not done yet: push (the `dc` token gets 403 on all four repos), the archive notice in `lumix-zs100-controller`, new dc
   projects/containers for the three app repos (Cameron, on the host).
+
+### Phase 1: core runtimes (2026-11-22)
+
+- `schema/driver.schema.json`; `drivers/panasonic-camcgi.json` (abstract family base, its `features` are the cautious mode) and
+  `drivers/panasonic-zs100.json` (`extends` it), replacing the draft `panasonic-lumix.json`.
+- `js/lux-camera.js` and `py/luxcamera/` with the same API: driver resolve/match/validate, denylist guard (`denyReason` /
+  `deny_reason`), parsers (state, capability, device description, SSDP, Browse), `Camera` (probe, connect, ensureMedia,
+  identify, list, date, media request, native slices `save`/`liveView`/`discoverSlice`, `remote.*`).
+- `tests/cases/*.json` run by both `tests/runtime.test.mjs` and `tests/test_runtime.py`, plus end-to-end runs against
+  `tools/fakecam.py --driver` (ok and busy cameras); `.github/workflows/test.yml` runs both. All pass (JS 42 tests, Python all
+  cases as subtests + 2 e2e).
+- `tools/camcheck.py` / `camcheck.mjs`: read-only check against a real camera; they stop with a message when the probe fails.
+- **Not done:** the read-only run against the real ZS100. On 2026-11-22 the camera didn't answer at 10.0.0.220. Run both
+  camchecks once it's on Wi-Fi (Remote Shooting & View), before Phase 2.

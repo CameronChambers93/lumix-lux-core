@@ -1,0 +1,198 @@
+[
+ {
+  "name": "getstate is allowed",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=getstate"
+  ],
+  "expect": {
+   "denied": false
+  }
+ },
+ {
+  "name": "pairing is allowed",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=accctrl&type=req_acc&value=4D454930-0100-1000-0000&value2=lumix-hub"
+  ],
+  "expect": {
+   "denied": false
+  }
+ },
+ {
+  "name": "playmode, video, zoom and touch are allowed",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=camcmd&value=video_recstart"
+  ],
+  "expect": {
+   "denied": false
+  }
+ },
+ {
+  "name": "touch focus is allowed",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=camctrl&type=touch&value=500/500&value2=on"
+  ],
+  "expect": {
+   "denied": false
+  }
+ },
+ {
+  "name": "media files are allowed",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220:50001/DO1060871.JPG"
+  ],
+  "expect": {
+   "denied": false
+  }
+ },
+ {
+  "name": "delete is refused",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=camcmd&value=delete&value2=1060871"
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "a del-anything word is refused",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=delcontents&value=all"
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "percent-encoding doesn't hide it",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=camcmd&value=%64%65%6C%65%74%65"
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "upper case doesn't hide it",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=CamCmd&value=DELETE_ALL"
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "format is refused",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=camcmd&value=format"
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "setsetting is refused",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=setsetting&type=clock&value=20261106153827"
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "setinfo is refused",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi?mode=setinfo&type=x"
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "a delete path is refused",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/delete.cgi"
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "SOAP Browse is allowed",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220:60606/Server0/CDS_control",
+   {
+    "method": "POST",
+    "body": "<s:Envelope><s:Body><u:Browse><ObjectID>0</ObjectID><StartingIndex>0</StartingIndex><RequestedCount>50</RequestedCount><SortCriteria></SortCriteria></u:Browse></s:Body></s:Envelope>",
+    "headers": {
+     "SOAPACTION": "\"urn:schemas-upnp-org:service:ContentDirectory:1#Browse\""
+    }
+   }
+  ],
+  "expect": {
+   "denied": false
+  }
+ },
+ {
+  "name": "SOAP DestroyObject is refused",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220:60606/Server0/CDS_control",
+   {
+    "method": "POST",
+    "body": "<u:DestroyObject><ObjectID>1</ObjectID></u:DestroyObject>",
+    "headers": {
+     "SOAPACTION": "\"urn:schemas-upnp-org:service:ContentDirectory:1#DestroyObject\""
+    }
+   }
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "a write action hidden in a Browse body is refused",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220:60606/Server0/CDS_control",
+   {
+    "method": "POST",
+    "body": "<u:UpdateObject><ObjectID>1</ObjectID></u:UpdateObject>",
+    "headers": {
+     "soapaction": "\"urn:schemas-upnp-org:service:ContentDirectory:1#Browse\""
+    }
+   }
+  ],
+  "expect": {
+   "denied": true
+  }
+ },
+ {
+  "name": "a POST without SOAPACTION is refused",
+  "fn": "denyReason",
+  "args": [
+   "http://10.0.0.220/cam.cgi",
+   {
+    "method": "POST",
+    "body": "mode=getstate",
+    "headers": {}
+   }
+  ],
+  "expect": {
+   "denied": true
+  }
+ }
+]

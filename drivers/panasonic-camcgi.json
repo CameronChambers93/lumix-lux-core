@@ -1,0 +1,80 @@
+{
+  "id": "panasonic-camcgi",
+  "schema": 1,
+  "version": 1,
+  "protocol": "panasonic-camcgi",
+  "abstract": true,
+  "name": "Panasonic Lumix (Wi-Fi, cam.cgi + UPnP)",
+  "label": "Lumix camera",
+  "appIdPrefix": "4D454930-0100-1000-",
+
+  "control": {
+    "port": 80,
+    "path": "/cam.cgi",
+    "busy": "err_already_connected",
+    "busyStatus": 503,
+    "probe": { "query": "mode=getstate", "match": "<camrply" },
+    "pair": { "query": "mode=accctrl&type=req_acc&value={appId}&value2={appName}", "okPrefix": "ok", "timeoutMs": 15000 },
+    "state": { "query": "mode=getstate", "resultTag": "result", "okValue": "ok", "batteryTag": "batt", "modeTag": "cammode" },
+    "capability": { "query": "mode=getinfo&type=capability", "modelTag": "model" },
+    "modes": {
+      "media": { "value": "play", "query": "mode=camcmd&value=playmode" },
+      "rec": { "value": "rec", "query": "mode=camcmd&value=recmode" }
+    },
+    "settleMs": 2000,
+    "keepaliveMs": 5000,
+    "timeoutMs": 4000
+  },
+
+  "media": {
+    "protocol": "upnp-cds",
+    "controlPort": 60606,
+    "controlPath": "/Server0/CDS_control",
+    "objectId": "0",
+    "pageSize": 50,
+    "retryCounts": [50, 20, 10, 5],
+    "resourceProfile": "PANASONIC\\.COM_PN=(\\w+)",
+    "roles": { "orig": "CAM_ORG", "thumb": "CAM_TN", "preview": "CAM_LRGTN" },
+    "idPattern": "^\\d+$",
+    "nameTemplate": "P{id}.{ext}",
+    "dateHeader": "X-REC_DATE_TIME",
+    "dateFrom": "thumb",
+    "range": true,
+    "slots": 2
+  },
+
+  "discovery": {
+    "ssdp": {
+      "port": 1900,
+      "target": "urn:schemas-upnp-org:device:MediaServer:1",
+      "cdsTarget": "urn:schemas-upnp-org:service:ContentDirectory:1",
+      "replyContains": [":60606/", "panasonic"]
+    },
+    "busyPort": 60606,
+    "info": { "nameTag": "friendlyName", "modelTag": "modelNumber", "firmwareTag": "X_FirmVersion", "manufacturerTag": "manufacturer" }
+  },
+
+  "remote": {
+    "liveView": {
+      "port": 49199,
+      "start": "mode=startstream&value={port}",
+      "stop": "mode=stopstream",
+      "jpegScan": true
+    },
+    "commands": {
+      "capture": "mode=camcmd&value=capture",
+      "videoStart": "mode=camcmd&value=video_recstart",
+      "videoStop": "mode=camcmd&value=video_recstop",
+      "zoomWide": "mode=camcmd&value=wide-normal",
+      "zoomTele": "mode=camcmd&value=tele-normal",
+      "zoomStop": "mode=camcmd&value=zoomstop",
+      "focus": "mode=camctrl&type=touch&value={x}/{y}&value2=on"
+    },
+    "focusScale": 1000
+  },
+
+  "features": {
+    "remote": false, "liveView": false, "video": true, "touchFocus": false, "zoom": "none",
+    "dates": "header", "range": true, "gps": "phone"
+  }
+}

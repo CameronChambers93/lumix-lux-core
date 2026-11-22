@@ -1,0 +1,111 @@
+[
+ {
+  "name": "a page of photos and a video",
+  "fn": "parseBrowse",
+  "driver": "panasonic-zs100",
+  "args": [
+   "<?xml version=\"1.0\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:BrowseResponse xmlns:u=\"urn:schemas-upnp-org:service:ContentDirectory:1\"><Result>&lt;DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\"&gt;&lt;item id=\"1070279\" parentID=\"0\" restricted=\"0\"&gt;&lt;dc:title&gt;107-0279&lt;/dc:title&gt;&lt;upnp:writeStatus&gt;WRITABLE&lt;/upnp:writeStatus&gt;&lt;upnp:class name=\"imageItem\"&gt;object.item.imageItem&lt;/upnp:class&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_LRG;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=00900000000000000000000000000000;PANASONIC.COM_PN=CAM_ORG\" size=\"4894720\"&gt;http://10.0.0.220:50001/DO1070279.JPG&lt;/res&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_TN;PANASONIC.COM_PN=CAM_TN\" size=\"5120\"&gt;http://10.0.0.220:50001/DT1070279.JPG&lt;/res&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_SM;PANASONIC.COM_PN=CAM_LRGTN\" size=\"102400\"&gt;http://10.0.0.220:50001/DS1070279.JPG&lt;/res&gt;&lt;/item&gt;&lt;item id=\"1070001\" parentID=\"0\" restricted=\"0\"&gt;&lt;dc:title&gt;107-0001&lt;/dc:title&gt;&lt;upnp:writeStatus&gt;WRITABLE&lt;/upnp:writeStatus&gt;&lt;upnp:class name=\"videoItem\"&gt;object.item.videoItem.movie&lt;/upnp:class&gt;&lt;res protocolInfo=\"http-get:*:video/mp4:DLNA.ORG_PN=JPEG_LRG;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=00900000000000000000000000000000;PANASONIC.COM_PN=CAM_ORG\" size=\"4894720\" duration=\"0:01:05\"&gt;http://10.0.0.220:50001/DO1070001.MP4&lt;/res&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_TN;PANASONIC.COM_PN=CAM_TN\" size=\"5120\"&gt;http://10.0.0.220:50001/DT1070001.JPG&lt;/res&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_SM;PANASONIC.COM_PN=CAM_LRGTN\" size=\"102400\"&gt;http://10.0.0.220:50001/DS1070001.JPG&lt;/res&gt;&lt;/item&gt;&lt;item id=\"1060871\" parentID=\"0\" restricted=\"0\"&gt;&lt;dc:title&gt;106-0871&lt;/dc:title&gt;&lt;upnp:writeStatus&gt;WRITABLE&lt;/upnp:writeStatus&gt;&lt;upnp:class name=\"imageItem\"&gt;object.item.imageItem&lt;/upnp:class&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_LRG;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=00900000000000000000000000000000;PANASONIC.COM_PN=CAM_ORG\" size=\"4894720\"&gt;http://10.0.0.220:50001/DO1060871.JPG&lt;/res&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_TN;PANASONIC.COM_PN=CAM_TN\" size=\"5120\"&gt;http://10.0.0.220:50001/DT1060871.JPG&lt;/res&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_SM;PANASONIC.COM_PN=CAM_LRGTN\" size=\"102400\"&gt;http://10.0.0.220:50001/DS1060871.JPG&lt;/res&gt;&lt;/item&gt;&lt;/DIDL-Lite&gt;</Result><NumberReturned>3</NumberReturned><TotalMatches>4</TotalMatches><UpdateID>1</UpdateID></u:BrowseResponse></s:Body></s:Envelope>"
+  ],
+  "expect": {
+   "total": 4,
+   "returned": 3,
+   "items": [
+    {
+     "id": "1070279",
+     "name": "P1070279.JPG",
+     "size": 4894720,
+     "kind": "photo",
+     "orig": "http://10.0.0.220:50001/DO1070279.JPG",
+     "thumb": "http://10.0.0.220:50001/DT1070279.JPG",
+     "preview": "http://10.0.0.220:50001/DS1070279.JPG",
+     "dur": 0
+    },
+    {
+     "id": "1070001",
+     "name": "P1070001.MP4",
+     "size": 4894720,
+     "kind": "video",
+     "orig": "http://10.0.0.220:50001/DO1070001.MP4",
+     "thumb": "http://10.0.0.220:50001/DT1070001.JPG",
+     "preview": "http://10.0.0.220:50001/DS1070001.JPG",
+     "dur": 65
+    },
+    {
+     "id": "1060871",
+     "name": "P1060871.JPG",
+     "size": 4894720,
+     "kind": "photo",
+     "orig": "http://10.0.0.220:50001/DO1060871.JPG",
+     "thumb": "http://10.0.0.220:50001/DT1060871.JPG",
+     "preview": "http://10.0.0.220:50001/DS1060871.JPG",
+     "dur": 0
+    }
+   ]
+  }
+ },
+ {
+  "name": "an item without thumbnails, and a folder, and a non-numeric id",
+  "fn": "parseBrowse",
+  "driver": "panasonic-zs100",
+  "args": [
+   "<?xml version=\"1.0\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:BrowseResponse xmlns:u=\"urn:schemas-upnp-org:service:ContentDirectory:1\"><Result>&lt;DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\"&gt;&lt;item id=\"1070300\" parentID=\"0\" restricted=\"0\"&gt;&lt;dc:title&gt;107-0300&lt;/dc:title&gt;&lt;upnp:writeStatus&gt;WRITABLE&lt;/upnp:writeStatus&gt;&lt;upnp:class name=\"imageItem\"&gt;object.item.imageItem&lt;/upnp:class&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_LRG;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=00900000000000000000000000000000;PANASONIC.COM_PN=CAM_ORG\" size=\"4894720\"&gt;http://10.0.0.220:50001/DO1070300.JPG&lt;/res&gt;&lt;/item&gt;&lt;container id=\"1\" parentID=\"0\"&gt;&lt;dc:title&gt;DCIM&lt;/dc:title&gt;&lt;/container&gt;&lt;item id=\"abc\" parentID=\"0\" restricted=\"0\"&gt;&lt;dc:title&gt;abc-&lt;/dc:title&gt;&lt;upnp:writeStatus&gt;WRITABLE&lt;/upnp:writeStatus&gt;&lt;upnp:class name=\"imageItem\"&gt;object.item.imageItem&lt;/upnp:class&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_LRG;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=00900000000000000000000000000000;PANASONIC.COM_PN=CAM_ORG\" size=\"4894720\"&gt;http://10.0.0.220:50001/DOabc.JPG&lt;/res&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_TN;PANASONIC.COM_PN=CAM_TN\" size=\"5120\"&gt;http://10.0.0.220:50001/DTabc.JPG&lt;/res&gt;&lt;res protocolInfo=\"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_SM;PANASONIC.COM_PN=CAM_LRGTN\" size=\"102400\"&gt;http://10.0.0.220:50001/DSabc.JPG&lt;/res&gt;&lt;/item&gt;&lt;/DIDL-Lite&gt;</Result><NumberReturned>3</NumberReturned><TotalMatches>3</TotalMatches><UpdateID>1</UpdateID></u:BrowseResponse></s:Body></s:Envelope>"
+  ],
+  "expect": {
+   "total": 3,
+   "returned": 3,
+   "items": [
+    {
+     "id": "1070300",
+     "name": "P1070300.JPG",
+     "size": 4894720,
+     "kind": "photo",
+     "orig": "http://10.0.0.220:50001/DO1070300.JPG",
+     "thumb": null,
+     "preview": null,
+     "dur": 0
+    }
+   ]
+  }
+ },
+ {
+  "name": "an empty card",
+  "fn": "parseBrowse",
+  "driver": "panasonic-zs100",
+  "args": [
+   "<?xml version=\"1.0\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\"><s:Body><u:BrowseResponse xmlns:u=\"urn:schemas-upnp-org:service:ContentDirectory:1\"><Result>&lt;DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\"&gt;&lt;/DIDL-Lite&gt;</Result><NumberReturned>0</NumberReturned><TotalMatches>0</TotalMatches><UpdateID>1</UpdateID></u:BrowseResponse></s:Body></s:Envelope>"
+  ],
+  "expect": {
+   "total": 0,
+   "returned": 0,
+   "items": []
+  }
+ },
+ {
+  "name": "newest first",
+  "fn": "sortItems",
+  "args": [
+   [
+    {
+     "id": "999"
+    },
+    {
+     "id": "1070279"
+    },
+    {
+     "id": "1060871"
+    }
+   ]
+  ],
+  "expect": [
+   {
+    "id": "1070279"
+   },
+   {
+    "id": "1060871"
+   },
+   {
+    "id": "999"
+   }
+  ]
+ }
+]

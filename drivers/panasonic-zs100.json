@@ -1,0 +1,15 @@
+{
+  "id": "panasonic-zs100",
+  "schema": 1,
+  "version": 3,
+  "extends": "panasonic-camcgi",
+  "name": "Lumix ZS100 / TZ100 / TZ101",
+  "label": "ZS100",
+  "match": { "modelNumber": "^DMC-(ZS100|TZ100|TZ101)$", "capabilityModel": "^(TZ100|ZS100|TZ101)$" },
+  "hotspot": { "ip": "192.168.54.1", "ssidPrefix": "ZS100-" },
+  "features": {
+    "remote": true, "liveView": true, "video": true, "touchFocus": true, "zoom": "normal",
+    "dates": "header", "range": true, "gps": "phone"
+  },
+  "verified": { "firmware": "D2.90", "date": "2026-11-06", "by": "docs/protocols/panasonic-camcgi.md" }
+}
