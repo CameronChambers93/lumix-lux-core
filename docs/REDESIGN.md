@@ -204,3 +204,22 @@ or the address is typed), or with the share sheet (email, Drive) when the PC isn
   `<productinfo><modelname>`, not the `<model>` the draft and fakecam assumed (JS fell back to the cautious base driver); and
   the camera's media server stalls on a kept-alive connection, so the node transport now sends `Connection: close` (dates
   went from ~4.3 s to ~0.15 s each; noted in the protocol doc for the native transports in Phases 3 and 7).
+
+### Phase 2: Windows onto core (2026-11-22)
+
+- `app/server.py` has no camera protocol of its own any more: its `Camera` wraps `luxcamera.Camera` (state, pair, media mode, list,
+  dates, media requests, all through the denylist guard). Gone: `parse_didl`, `parse_dur`, the inline `cam.cgi`/Browse/SSDP code;
+  `probe_camera`/`ssdp_search` use the family base driver. On connect it identifies the camera (unicast SSDP → device description +
+  capability) and `match_driver` picks the driver; `/api/status` has `camera.driver` (id, name, matched, by, features), `model`,
+  `firmware`. The page shows the model and, in Settings → Camera support, the driver.
+- Diagnostics inbox: `app/diagnostics.py`, `POST /api/diagnostics` (JSON object, max 20 MB) → `data/diagnostics/inbox/<model>-<date>.json`,
+  `GET /api/diagnostics[/<name>]`, page `/diagnostics` (linked from Settings). The report schema comes in Phase 4; the inbox is lenient.
+- Release zip bundles `core/py/luxcamera`, `core/drivers`, `core/schema` under `core/` (same layout as the repo); checked by
+  unzipping and starting the server from it. `guard.py` fixed for Python 3.9 (the release's minimum).
+- Tests: `app/test_server.py` runs the real server against `fakecam.py --driver` (new `LUMIX_PORT_MAP` env maps the camera's ports onto
+  fakecam's one port): status/driver match, items, dates, thumbnails/previews, sync, media, zip, find camera (/24 sweep), busy,
+  cautious mode (GH5), diagnostics, and no denylisted request; plus `test_exif.py`, `test_diagnostics.py`. All pass (~21 s).
+- Real ZS100 (fw 1.20, 223 items), fresh data and library folders: find camera from a wrong IP (sweep found .220 in 12 s), matched
+  `panasonic-zs100` by `modelNumber`, playmode switch from rec, all 223 dates filled, thumbnail + preview, EXIF from the camera's
+  first 128 KB, sync of a photo and a 16 MB video, Range on `/media`. Pages checked in headless Chromium (light/dark, phone width).
+- Not covered by fakecam: camera-side EXIF (`FAKE_PHOTO` is ignored in `--driver` mode); verified on the real camera instead.
