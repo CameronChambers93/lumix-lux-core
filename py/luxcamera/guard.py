@@ -3,6 +3,8 @@
 Same rules as js/lux-camera.js: a request is refused when a word of its path or query (split on anything but letters,
 digits and _) starts with "del" or contains "delete", or starts with "format", "setsetting" or "setinfo".
 POSTs must be a SOAP Browse or Search with no write action in the body."""
+from __future__ import annotations
+
 import re
 from urllib.parse import unquote_plus
 
