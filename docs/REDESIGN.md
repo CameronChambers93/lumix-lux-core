@@ -199,5 +199,8 @@ or the address is typed), or with the share sheet (email, Drive) when the PC isn
   `tools/fakecam.py --driver` (ok and busy cameras); `.github/workflows/test.yml` runs both. All pass (JS 42 tests, Python all
   cases as subtests + 2 e2e).
 - `tools/camcheck.py` / `camcheck.mjs`: read-only check against a real camera; they stop with a message when the probe fails.
-- **Not done:** the read-only run against the real ZS100. On 2026-11-22 the camera didn't answer at 10.0.0.220. Run both
-  camchecks once it's on Wi-Fi (Remote Shooting & View), before Phase 2.
+- Real ZS100 (fw 1.20, 223 items), read-only camcheck with both runtimes: probe, connect, identify, match `panasonic-zs100`,
+  list (5 videos), dates of the 3 newest, Range read, all OK. It found two bugs, now fixed: the capability model is
+  `<productinfo><modelname>`, not the `<model>` the draft and fakecam assumed (JS fell back to the cautious base driver); and
+  the camera's media server stalls on a kept-alive connection, so the node transport now sends `Connection: close` (dates
+  went from ~4.3 s to ~0.15 s each; noted in the protocol doc for the native transports in Phases 3 and 7).

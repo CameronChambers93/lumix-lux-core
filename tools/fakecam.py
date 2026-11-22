@@ -12,7 +12,7 @@
 # Redesign phase 1: --driver <drivers/x.json> [--items N] makes it a whole camera on one port, for the runtimes' tests:
 #   POST <media.controlPath>      UPnP Browse of N fake items (every 7th a video; at most 50 per page, like the ZS100)
 #   GET /D[OST]<id>.JPG|MP4        fake bytes, X-REC_DATE_TIME (item n: 2026-11-01 12:00 + n minutes), Range
-#   getinfo&type=capability        <model> from FAKE_MODEL (default TZ100); /A0CC2B248B00/Server0/ddd: device description
+#   getinfo&type=capability        <modelname> from FAKE_MODEL (default TZ100); /A0CC2B248B00/Server0/ddd: device description
 #   Any request the runtimes' denylist would refuse is recorded in /_stats "denied" (the tests expect none).
 import sys, os, re, glob, time, socket, threading, json, html
 from datetime import datetime, timedelta
@@ -126,7 +126,7 @@ class H(BaseHTTPRequestHandler):
             if mm and mm.group(2) in ITEMS: return self.send_item(ITEMS[mm.group(2)], mm.group(1))
             if u.path.endswith("/Server0/ddd"): return self.send(DDD)
             if g("mode") == "getinfo" and g("type") == "capability":
-                return self.send(('<?xml version="1.0"?><camrply><result>ok</result><comm_proto_ver>1.6</comm_proto_ver><product_info><model>%s</model></product_info></camrply>' % MODEL).encode())
+                return self.send(('<?xml version="1.0"?><camrply><result>ok</result><comm_proto_ver>1.6</comm_proto_ver><productinfo><modelname>%s</modelname></productinfo></camrply>' % MODEL).encode())
         if PHOTO and re.match(r"^/D[OST].*\.JPG$", u.path):
             data, rec = photo_for(q)
             if self.command == "HEAD": return self.send_head_only(len(data), rec)

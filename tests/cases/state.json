@@ -65,7 +65,7 @@
   "fn": "parseCapability",
   "driver": "panasonic-zs100",
   "args": [
-   "<?xml version=\"1.0\"?><camrply><result>ok</result><comm_proto_ver>1.6</comm_proto_ver><product_info><model>TZ100</model></product_info><camcmd_list><camcmd>tele-normal</camcmd></camcmd_list></camrply>"
+   "<?xml version=\"1.0\"?><camrply><result>ok</result><comm_proto_ver>1.6</comm_proto_ver><productinfo><modelname>TZ100</modelname></productinfo><camcmdlist><camcmd>tele-normal</camcmd></camcmdlist></camrply>"
   ],
   "expect": {
    "model": "TZ100"

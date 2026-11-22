@@ -470,10 +470,11 @@ class Remote {
   }
 }
 
-// A transport for node (tests, tools): fetch with a timeout.
+// A transport for node (tests, tools): fetch with a timeout. Connection: close because the camera's media server answers
+// nothing else while a kept-alive connection sits idle (each request then waits ~4 s for undici to drop it).
 export function fetchTransport() {
   const go = async (url, init, timeout) => {
-    const r = await fetch(url, { ...init, signal: AbortSignal.timeout(timeout) });
+    const r = await fetch(url, { ...init, headers: { Connection: "close", ...init.headers }, signal: AbortSignal.timeout(timeout) });
     const headers = {};
     r.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
     return { status: r.status, headers, body: await r.text() };

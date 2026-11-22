@@ -43,7 +43,10 @@ screen; otherwise it drops packets silently.
 - **Range works.** `Accept-Ranges: bytes`; `-r 100-199` on `DO1070274.JPG` and on `DO1070001.MP4` both return
   `206 Partial Content` with correct `Content-Range: bytes 100-199/<total>`; open-ended `-r N-` works too (tail of
   the file returned). A `-r 0-0` on `DT` returns 206 as well. So resume with `Range: bytes=N-` is possible.
-- **Capability** (`getinfo&type=capability`, 8 KB): `comm_proto_ver 1.6`, model `TZ100`; camcmds
+- **No keep-alive on :50001.** While a client holds an idle kept-alive connection, the media server doesn't answer a new
+  one until that connection closes (node `fetch`: every request after the first took ~4.3 s instead of ~0.1 s, 2026-11-22).
+  Send `Connection: close` or don't pool connections to the camera.
+- **Capability** (`getinfo&type=capability`, 8 KB): `comm_proto_ver 1.6`, model `<productinfo><modelname>TZ100</modelname>`; camcmds
   `tele-normal, tele-fast, wide-normal, wide-fast, 4kphoto_marking`; camspecs `touch_command_auto,
   oneshot_af_enable, setting_play_sort_mode_enable, af_size_change_pinch, zoombar_with_partition_focaldist,
   lens_detach_disable, normal_disp_with_zoom_operation_enable, long_expo_disp_T, geotag_add_enable,

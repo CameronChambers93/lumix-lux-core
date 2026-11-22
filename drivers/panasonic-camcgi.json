@@ -16,7 +16,7 @@
     "probe": { "query": "mode=getstate", "match": "<camrply" },
     "pair": { "query": "mode=accctrl&type=req_acc&value={appId}&value2={appName}", "okPrefix": "ok", "timeoutMs": 15000 },
     "state": { "query": "mode=getstate", "resultTag": "result", "okValue": "ok", "batteryTag": "batt", "modeTag": "cammode" },
-    "capability": { "query": "mode=getinfo&type=capability", "modelTag": "model" },
+    "capability": { "query": "mode=getinfo&type=capability", "modelTag": "modelname" },
     "modes": {
       "media": { "value": "play", "query": "mode=camcmd&value=playmode" },
       "rec": { "value": "rec", "query": "mode=camcmd&value=recmode" }
