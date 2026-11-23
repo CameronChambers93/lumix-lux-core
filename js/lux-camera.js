@@ -400,17 +400,19 @@ export class Camera {
   // Slices of the driver for native code (save queue, discovery, live view). URLs are built and guard-checked here.
   slice(name) {
     const d = this.driver, c = d.control;
-    if (name === "save") return {
+    const checked = (o) => { for (const v of Object.values(o)) if (typeof v === "string" && /^https?:/.test(v)) guard(v); else if (isObj(v)) checked(v); return o; };
+    if (name === "save") return checked({
       keepaliveUrl: this.controlUrl(c.state.query), keepaliveMs: c.keepaliveMs,
       mediaMode: { value: c.modes.media.value, url: this.controlUrl(c.modes.media.query), modeTag: c.state.modeTag, settleMs: c.settleMs },
-      pairUrl: this.controlUrl(fill(c.pair.query, { appId: this.appId, appName: this.appName })),
-      busy: c.busy, dateHeader: d.media.dateHeader, slots: d.media.slots, range: d.media.range,
-    };
+      pairUrl: this.controlUrl(fill(c.pair.query, { appId: this.appId, appName: this.appName })), pairOkPrefix: c.pair.okPrefix,
+      okMatch: `<${c.state.resultTag}>${c.state.okValue}</${c.state.resultTag}>`, busy: c.busy, busyStatus: c.busyStatus,
+      dateHeader: d.media.dateHeader, slots: d.media.slots, range: d.media.range,
+    });
     if (name === "discover") return discoverSlice(d);
     if (name === "liveView") {
       if (!d.features.liveView) throw new Unsupported("live view");
       const lv = d.remote.liveView;
-      return { port: lv.port, startUrl: this.controlUrl(fill(lv.start, { port: lv.port })), stopUrl: this.controlUrl(lv.stop), jpegScan: lv.jpegScan };
+      return checked({ port: lv.port, startUrl: this.controlUrl(fill(lv.start, { port: lv.port })), stopUrl: this.controlUrl(lv.stop), jpegScan: lv.jpegScan });
     }
     throw new Error(`Unknown slice "${name}"`);
   }

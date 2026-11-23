@@ -364,13 +364,13 @@
       <p class="notice" id="setCamStat" aria-live="polite"></p>
       <label for="ipIn">Address on your home Wi-Fi</label>
       <input id="ipIn" inputmode="decimal" autocomplete="off" placeholder="10.0.0.220">
-      <p class="notice">The app finds the camera on its own, also when your router gives it a new address. You only need this to force one. On the camera's own Wi-Fi it's always 192.168.54.1.</p>
+      <p class="notice" id="ipNote">The app finds the camera on its own, also when your router gives it a new address. You only need this to force one.</p>
       <div class="btns"><button class="btn" id="findBtn">Find camera</button></div>
       <div id="findOut" aria-live="polite"></div>
       <label class="check"><input type="checkbox" id="joinIn"> Join the camera's Wi-Fi automatically</label>
       <div id="joinBox" hidden>
         <div class="pair">
-          <div><label for="ssidIn">Network name starts with</label><input id="ssidIn" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ZS100-"></div>
+          <div><label for="ssidIn">Network name starts with</label><input id="ssidIn" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. ZS100-"></div>
           <div><label for="pwIn">Password</label><input id="pwIn" type="password" autocomplete="off" placeholder="From the camera screen"></div>
         </div>
         <p class="notice">On the camera choose Wi-Fi, New connection, Remote Shooting &amp; View, Direct: its screen shows the name and password. The first time, Android asks you to approve joining it (one tap). Only tried while the app is open and the camera isn't found on your current Wi-Fi.</p>
@@ -378,6 +378,7 @@
         <p class="notice" id="joinOut" aria-live="polite"></p>
       </div>
     </div></section>
+    <section class="sec"><h4>Camera support</h4><div class="box"><dl id="drvList"></dl><p class="notice" id="drvNote"></p></div></section>
     <section class="sec"><h4>Saving</h4><div class="box">
       <label for="dirBase">Folder in your gallery</label>
       <div class="pair">
@@ -421,7 +422,6 @@ const $ = (id) => document.getElementById(id);
 const Native = window.Capacitor?.registerPlugin?.("LumixNative");
 const ICON_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const ICON_CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
-const HOTSPOT_IP = "192.168.54.1";
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
@@ -450,93 +450,81 @@ const fmtBytes = (b) => b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : b >= 1e6 ? (b 
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isSaved = (it) => it.source === "phone" || saved.get(it.name)?.size === it.size;
-const xml = (s) => new DOMParser().parseFromString(s, "text/xml");
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2600); }
 
-// ---- camera protocol (see lumix-lux-core docs/protocols/panasonic-camcgi.md)
-async function httpGet(url, timeout = 4000) {
-  const r = await Native.httpGet({ url, timeout });
-  if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
-  return r.body;
+// ---- camera: the shared runtime (core/js/lux-camera.js) and drivers (core/drivers), copied into www/ by the app build.
+// The page knows no protocol strings: everything camera-specific comes from the matched driver.
+let lux = null, DRIVERS = {};
+async function loadRuntime() {
+  lux = await import("./js/lux-camera.js");
+  const files = await (await fetch("drivers/index.json")).json();
+  for (const f of files) {
+    try { const d = await (await fetch("drivers/" + f)).json(); if (d.id) DRIVERS[d.id] = d; } catch {}
+  }
 }
-// The camera serves one app at a time; it answers others with HTTP 503 or err_already_connected.
+// Native transport: every request is pinned to Wi-Fi by the plugin; the runtime guard-checks it first.
+const transport = {
+  get: (url, { timeout, headers }) => Native.httpGet({ url, timeout, headers }),
+  post: (url, body, { timeout, headers }) => Native.httpPost({ url, body, timeout, headers }),
+};
+const familyBase = () => lux.matchDriver(DRIVERS, {}).driver;   // cautious mode: gallery and saving only
+let drv = null;          // { driver, matched, by } for the camera; remembered, so the UI fits it before it answers
+let lc = null;           // the runtime Camera for cam.ip
+let identified = null;   // the address the driver was picked at (once per session)
+let camInfo = null;      // what the camera said it is: { capabilityModel, modelNumber, friendlyName, firmware }
+function initDriver() {
+  const id = store.get("driverId", null);
+  try { if (id && DRIVERS[id]) { drv = { driver: lux.resolveDriver(id, DRIVERS), matched: !DRIVERS[id].abstract, by: store.get("driverBy", null) }; return; } } catch {}
+  drv = { driver: familyBase(), matched: false, by: null };
+}
+const feat = (k) => drv?.driver.features[k];
+const camLabel = () => drv?.driver.label || "Camera";
+function camAt(ip) {
+  if (!lc || lc.ip !== ip || lc.driver !== drv.driver) lc = new lux.Camera(drv.driver, ip, { transport, appId, appName: "lumix-phone" });
+  return lc;
+}
+// Addresses cameras have on their own hotspots, the current driver's first.
+const hotspotIps = () => [...new Set([drv?.driver.hotspot?.ip, ...Object.values(DRIVERS).map((d) => d.hotspot?.ip)].filter(Boolean))];
+const dateHeader = () => (feat("dates") === "header" ? drv.driver.media.dateHeader : null);
+const dateUrl = (i) => (dateHeader() ? i[drv.driver.media.dateFrom] || i.orig : null);
+
+// The camera serves one app at a time; it answers others with a busy reply (lux.Busy).
 const BUSY_MSG = "The camera is connected to another device (like the PC page). Close it there and this app takes over.";
-class Busy extends Error { constructor() { super(BUSY_MSG); } }
-async function getState(ip) {
-  const r = await Native.httpGet({ url: `http://${ip}/cam.cgi?mode=getstate`, timeout: 3000 });
-  if (r.status === 503 || r.body.includes("err_already_connected")) throw new Busy();
-  if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
-  const doc = xml(r.body);
-  return { ok: doc.querySelector("result")?.textContent === "ok", batt: doc.querySelector("batt")?.textContent, mode: doc.querySelector("cammode")?.textContent };
-}
+const isBusy = (e) => e?.name === "Busy";
+const getState = (ip) => camAt(ip).state();
 // The camera is sometimes found in rec mode (it goes back to its live view by itself after a client leaves), and the
-// phone should use it in playback mode (a listing right after a mode switch can answer HTTP 500; the listing retries). playmode is non-destructive; send it unless the Remote screen is using rec.
-async function ensurePlay(ip, mode) {
-  if (!mode || mode === "play" || remote.open || remote.closing) return;
-  try { await Native.httpGet({ url: `http://${ip}/cam.cgi?mode=camcmd&value=playmode`, timeout: 6000 }); await sleep(2000); } catch {}
+// phone should use it in its media mode (a listing right after a mode switch can fail; the listing retries). Switching is
+// non-destructive; do it unless the Remote screen is using rec.
+async function ensurePlay(ip, st) {
+  if (remote.open || remote.closing) return;
+  try { await camAt(ip).ensureMedia(st); } catch {}
 }
-async function pair(ip) {
-  const r = (await httpGet(`http://${ip}/cam.cgi?mode=accctrl&type=req_acc&value=${appId}&value2=lumix-phone`, 15000)).trim();
-  if (r.includes("err_already_connected")) throw new Busy();
-  if (!r.startsWith("ok")) throw new Error(`Camera refused the connection (${r})`);
-}
-function browseBody(start, count) {
-  return `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:Browse xmlns:u="urn:schemas-upnp-org:service:ContentDirectory:1"><ObjectID>0</ObjectID><BrowseFlag>BrowseDirectChildren</BrowseFlag><Filter>*</Filter><StartingIndex>${start}</StartingIndex><RequestedCount>${count}</RequestedCount><SortCriteria></SortCriteria></u:Browse></s:Body></s:Envelope>`;
-}
-function parseDur(item) {   // duration="0:00:01" on the original <res>, seconds
-  for (const r of item.getElementsByTagName("res")) {
-    const m = /^(\d+):(\d+):(\d+)/.exec(r.getAttribute("duration") || "");
-    if (m) return +m[1] * 3600 + +m[2] * 60 + +m[3];
-  }
-  return 0;
-}
-async function browseAll(ip) {
-  const url = `http://${ip}:60606/Server0/CDS_control`, out = [];
-  for (let start = 0, total = Infinity; start < total;) {
-    // A weak link (hotspot, emulator NAT) can cut a response short ("unexpected end of stream"). Retry the page,
-    // asking for fewer items each time, since small responses survive better.
-    let r;
-    for (const count of [50, 20, 10, 5]) {
-      try {
-        r = await Native.httpPost({ url, timeout: 30000, body: browseBody(start, count), headers: {
-          "Content-Type": 'text/xml; charset="utf-8"', SOAPACTION: '"urn:schemas-upnp-org:service:ContentDirectory:1#Browse"' } });
-        break;
-      } catch (e) {
-        if (count === 5) throw e;
-        await new Promise((ok) => setTimeout(ok, 400));
-      }
-    }
-    if (r.status !== 200) throw new Error(`Listing failed (HTTP ${r.status})`);
-    const env = xml(r.body);
-    total = +(env.getElementsByTagName("TotalMatches")[0]?.textContent || 0);
-    const got = +(env.getElementsByTagName("NumberReturned")[0]?.textContent || 0);
-    const didl = xml(env.getElementsByTagName("Result")[0]?.textContent || "<x/>");
-    for (const item of didl.getElementsByTagName("item")) {
-      const id = item.getAttribute("id"), res = {};
-      for (const r of item.getElementsByTagName("res")) {
-        const pn = /PANASONIC\.COM_PN=(\w+)/.exec(r.getAttribute("protocolInfo") || "");
-        if (pn) res[pn[1]] = { url: r.textContent.trim(), size: +r.getAttribute("size") };
-      }
-      if (!/^\d+$/.test(id || "") || !res.CAM_ORG) continue;
-      const ext = res.CAM_ORG.url.split(".").pop().toUpperCase();
-      const cls = item.getElementsByTagName("upnp:class")[0]?.textContent || "";
-      out.push({ id, name: `P${id}.${ext}`, size: res.CAM_ORG.size, kind: cls.includes("video") ? "video" : "photo",
-        orig: res.CAM_ORG.url, thumb: res.CAM_TN?.url, preview: res.CAM_LRGTN?.url, dur: parseDur(item) });
-    }
-    if (!got) break;
-    start += got;
-  }
-  return out.sort((a, b) => b.id - a.id);
+// Which driver fits this camera: unicast SSDP for its description, plus getinfo capability. An answer with nothing
+// in it (a stalled request) keeps the remembered driver and tries again at the next connect.
+async function identify(ip) {
+  if (identified === ip) return;
+  const c = camAt(ip), s = lux.discoverSlice(c.driver).ssdp;
+  let loc = null;
+  try { loc = (await Native.ssdpLocate({ ip, port: s.port, request: s.request, timeout: 2000 })).location || null; } catch {}
+  let info = {};
+  try { info = await c.identify(loc); } catch {}
+  if (!Object.values(info).some(Boolean)) return;
+  identified = ip; camInfo = info;
+  const m = lux.matchDriver(DRIVERS, info, c.driver.protocol);
+  drv = m; store.set("driverId", m.driver.id); store.set("driverBy", m.by);
+  camAt(ip).cdsUrl = c.cdsUrl;   // a new Camera if the driver changed; keep the media server URL the description gave
+  applyFeatures();
 }
 
 // ---- connection loop
 let autoDone = false;
 async function tryIp(ip) {
   let st = await getState(ip);
-  await pair(ip);
+  await camAt(ip).pair();
   if (!st.ok) st = await getState(ip);
-  await ensurePlay(ip, st.mode);
-  Object.assign(cam, { ip, online: true, batt: st.batt, error: "", joinMsg: "" });
+  await identify(ip);
+  await ensurePlay(ip, st);
+  Object.assign(cam, { ip, online: true, batt: st.battery, error: "", joinMsg: "" });
   store.set("ip", ip);
   await Promise.all([refreshCatalog(), refreshSaved()]);
   if (!autoDone) { autoDone = true; if (store.get("autoSave", false) && !catalogFailed && !sync.running) autoSave(); }
@@ -546,7 +534,9 @@ async function tryIp(ip) {
 const DISCOVER_EVERY = 30000;
 let lastDiscover = 0;
 const subnetOf = (ip) => { const m = /^(\d+\.\d+\.\d+)\.\d+$/.exec(ip || ""); return m ? m[1] + "." : null; };
-const discoverArgs = (timeout) => ({ timeout, subnets: [subnetOf(store.get("homeIp", "10.0.0.220"))].filter(Boolean) });
+// Native discovery is camera-agnostic: the family base driver says what to send and what a camera's reply looks like.
+const discoverArgs = (timeout) => ({ timeout, subnets: [subnetOf(store.get("homeIp", "10.0.0.220"))].filter(Boolean),
+  ...lux.discoverSlice(familyBase()), hotspots: hotspotIps() });
 async function discoverCamera(force) {
   if (!force && Date.now() - lastDiscover < DISCOVER_EVERY) return false;
   lastDiscover = Date.now();
@@ -560,7 +550,7 @@ async function discoverCamera(force) {
   if (found.ip !== store.get("homeIp", "10.0.0.220")) toast(`Found the camera at ${found.ip}`);
   store.set("homeIp", found.ip); store.set("ip", found.ip);
   if (found.state === "busy") { cam.error = BUSY_MSG; return false; }   // it's there; the loop picks it up at the new address
-  try { await tryIp(found.ip); return true; } catch (e) { if (e instanceof Busy) cam.error = BUSY_MSG; return false; }
+  try { await tryIp(found.ip); return true; } catch (e) { if (isBusy(e)) cam.error = BUSY_MSG; return false; }
 }
 // Auto-join the camera's own Wi-Fi (Android asks for approval itself, once). Foreground only, never during a save,
 // and not more often than every minute, backing off (1, 2, 4... up to 10 min) while it keeps failing.
@@ -574,10 +564,11 @@ async function maybeJoinHotspot(manual) {
     await Native.joinCameraWifi({ timeout: 45000 });
     joinFails = 0; joinedByUs = true;
     await Native.bindWifi();
-    await tryIp(HOTSPOT_IP);
-    return true;
+    let err;
+    for (const ip of hotspotIps()) { try { await tryIp(ip); return true; } catch (e) { err = e; if (isBusy(e)) break; } }
+    throw err || new Error("No camera answered on its Wi-Fi");
   } catch (e) {
-    if (e instanceof Busy) { cam.error = BUSY_MSG; return false; }
+    if (isBusy(e)) { cam.error = BUSY_MSG; return false; }
     joinFails++;
     cam.joinMsg = String(e.message || e).replace(/^Error: /, "");
     return false;
@@ -586,13 +577,13 @@ async function maybeJoinHotspot(manual) {
 async function connect({ force = false } = {}) {
   autoDone = false;
   try { await Native.bindWifi(); } catch {}
-  const candidates = [...new Set([store.get("ip", null), HOTSPOT_IP, store.get("homeIp", "10.0.0.220")].filter(Boolean))];
+  const candidates = [...new Set([store.get("ip", null), ...hotspotIps(), store.get("homeIp", "10.0.0.220")].filter(Boolean))];
   for (const ip of candidates) {
     try {
       await tryIp(ip);
       return true;
     } catch (e) {
-      if (e instanceof Busy) { cam.error = BUSY_MSG; return false; }
+      if (isBusy(e)) { cam.error = BUSY_MSG; return false; }
       if (!/timeout|connect|unreachable|refused|Network|failed to/i.test(String(e))) cam.error = String(e.message || e);
     }
   }
@@ -605,8 +596,8 @@ async function loop() {
     if (sync.running) { renderStatus(); await sleep(2000); continue; }   // the service keeps the camera session during a save
     if (cam.online) {
       Native.bindWifi().catch(() => {});   // cheap; follows the Wi-Fi network if it was replaced (WebView image loads use the process binding)
-      try { const st = await getState(cam.ip); cam.batt = st.batt; if (!st.ok) await pair(cam.ip); await ensurePlay(cam.ip, st.mode); if (catalogFailed && !sync.running) refreshCatalog(); }
-      catch (e) { cam.online = false; if (e instanceof Busy) cam.error = BUSY_MSG; }
+      try { const st = await getState(cam.ip); cam.batt = st.battery; if (!st.ok) await camAt(cam.ip).pair(); await ensurePlay(cam.ip, st); if (catalogFailed && !sync.running) refreshCatalog(); }
+      catch (e) { cam.online = false; if (isBusy(e)) cam.error = BUSY_MSG; }
     } else {
       if (joinedByUs && offlineSince && Date.now() - offlineSince > 120000) { joinedByUs = false; Native.leaveCameraWifi().catch(() => {}); }   // the camera is gone for good
       await connect();
@@ -624,11 +615,11 @@ async function refreshCatalog() {
   try {
     Native.stopDates().catch(() => {});
     for (let i = 0; i < 30 && thumbActive > 0; i++) await sleep(200);   // let requests in flight finish
-    try { await ensurePlay(cam.ip, (await getState(cam.ip)).mode); } catch {}
+    try { await ensurePlay(cam.ip, await getState(cam.ip)); } catch {}
     let err = null;
     for (let attempt = 0; attempt < 3; attempt++) {
-      try { catalog = await browseAll(cam.ip); store.set("catalog", catalog); err = null; break; }
-      catch (e) { err = e; try { await ensurePlay(cam.ip, (await getState(cam.ip)).mode); } catch {} await sleep(1500); }  // e.g. HTTP 500 right after a mode switch
+      try { catalog = await camAt(cam.ip).list(); store.set("catalog", catalog); err = null; break; }
+      catch (e) { err = e; try { await ensurePlay(cam.ip, await getState(cam.ip)); } catch {} await sleep(1500); }  // e.g. HTTP 500 right after a mode switch
     }
     catalogFailed = !!err;
     cam.error = err ? `Couldn't list the photos: ${err.message || err}` : "";
@@ -646,7 +637,7 @@ async function refreshSaved() {
   render();
 }
 
-// ---- dates: the camera's Browse has none; X-REC_DATE_TIME (local time, no zone) comes with any media request
+// ---- dates: the camera's Browse has none; with dates "header" the driver's dateHeader (local time, no zone) comes with any media request
 function parseCamDate(s) {
   const m = /^(\d+)-(\d+)-(\d+)T(\d+):(\d+):(\d+)/.exec(s || "");
   return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : 0;
@@ -662,11 +653,11 @@ function setDate(id, str) {
 Native?.addListener("date", (d) => setDate(d.id, d.date));
 function startDates() {   // background, newest first; saving and listing have priority
   if (sync.running || browsing || lbIndex >= 0 || remote.open || !cam.online) return;   // the open viewer / remote has priority over date lookups
-  const todo = catalog.filter((i) => !dates[i.id] && i.thumb).sort((a, b) => b.id - a.id);
-  if (todo.length) Native.camDates({ items: todo.map((i) => ({ id: i.id, url: i.thumb })) }).catch(() => {});
+  const todo = catalog.filter((i) => !dates[i.id] && dateUrl(i)).sort((a, b) => b.id - a.id);
+  if (todo.length) Native.camDates({ items: todo.map((i) => ({ id: i.id, url: dateUrl(i) })), header: dateHeader(), range: drv.driver.media.range }).catch(() => {});
 }
 
-setInterval(() => { if (cam.online && !sync.running && lbIndex < 0 && !remote.open && catalog.some((i) => !dates[i.id] && i.thumb)) startDates(); }, 20000);   // the run gives up when the camera stalls; pick it up again
+setInterval(() => { if (cam.online && !sync.running && lbIndex < 0 && !remote.open && catalog.some((i) => !dates[i.id] && dateUrl(i))) startDates(); }, 20000);   // the run gives up when the camera stalls; pick it up again
 
 // One list: the camera's catalog, plus saved files the catalog doesn't have (they still show with the camera off).
 function mergeItems() {
@@ -760,7 +751,8 @@ async function saveItems(list, { auto = false } = {}) {
   await askNotifications();
   Native.stopDates().catch(() => {});
   try {
-    applyQueue(await Native.enqueue({ camIp: cam.ip, appId, folder: curFolder(), parallel: store.get("parallel", 1),
+    const driver = camAt(cam.ip).slice("save");   // what the native queue needs to know about the camera
+    applyQueue(await Native.enqueue({ camIp: cam.ip, driver, folder: curFolder(), parallel: Math.min(store.get("parallel", 1), driver.slots),
       items: fit.map((i) => ({ url: i.orig, name: i.name, size: i.size, mime: i.kind === "video" ? "video/mp4" : "image/jpeg", date: dates[i.id] || 0 })) }));
     if (auto) toast(`Saving ${plural(fit.length, "new file")}`);
   } catch (e) { toast(String(e.message || e)); }
@@ -779,11 +771,11 @@ $("failClose").onclick = () => $("failDlg").close();
 function renderStatus() {
   const missing = catalog.filter((i) => !isSaved(i)).length;
   $("camPill").classList.toggle("on", cam.online);
-  $("camText").textContent = cam.online ? `ZS100 · battery ${cam.batt || "?"}` : cam.searching ? "Searching…" : cam.joining ? "Joining Wi-Fi…" : "Camera offline";   // short: the card below has the full sentence
+  $("camText").textContent = cam.online ? `${camLabel()} · battery ${cam.batt || "?"}` : cam.searching ? "Searching…" : cam.joining ? "Joining Wi-Fi…" : "Camera offline";   // short: the card below has the full sentence
   $("offlineHelp").hidden = cam.online || sync.running || cam.searching || cam.joining;
   $("progress").hidden = $("cancelBtn").hidden = !sync.running;
   $("syncBtn").hidden = sync.running;
-  $("remoteBtn").hidden = !(cam.online && !sync.running) && !remote.open;
+  $("remoteBtn").hidden = !(cam.online && !sync.running && feat("remote")) && !remote.open;
   if (remote.open) { $("rmInfo").textContent = remoteInfo(); if (!cam.online && !remote.closing) { toast("Lost the camera"); closeRemote(); } }
   if (sync.running) {
     const done = sync.bytes;
@@ -863,7 +855,7 @@ async function loadThumb(img) {
   }
   if (!ok && it && it.thumb) {
     try {
-      const r = await Native.camThumb({ url: it.thumb, id: it.id, cacheOnly: !cam.online });
+      const r = await Native.camThumb({ url: it.thumb, id: it.id, cacheOnly: !cam.online, header: dateHeader() });
       if (r.date) setDate(it.id, r.date);
       ok = await setImg(img, cfs(r.path), false);
     } catch { if (!cam.online) img.dataset.miss = "off"; }
@@ -1365,7 +1357,7 @@ async function fillInfo(it) {
   if (!ex) {
     if (!it.uri && !cam.online) { note.hidden = false; note.textContent = "Camera details aren't available while the camera is off."; return; }
     note.hidden = false; note.textContent = "Reading details…";
-    try { ex = it.uri ? await Native.exif({ uri: it.uri }) : await Native.exifRemote({ url: it.orig }); exifCache.set(it.id, ex); }
+    try { ex = it.uri ? await Native.exif({ uri: it.uri }) : await Native.exifRemote({ url: it.orig, header: dateHeader() }); exifCache.set(it.id, ex); }
     catch { if (lbId === it.id) note.textContent = "Couldn't read the camera details."; return; }
   }
   if (lbId !== it.id || $("lbInfo").hidden) return;
@@ -1464,7 +1456,7 @@ $("findBtn").onclick = async () => {
   try {
     const res = await Native.discover(discoverArgs(3000));
     out.replaceChildren();
-    if (res.hotspot) { out.textContent = "You're on the camera's own Wi-Fi: its address is 192.168.54.1."; return; }
+    if (res.hotspot) { out.textContent = `You're on the camera's own Wi-Fi: its address is ${res.hotspotIp}.`; return; }
     if (!res.cameras.length) { out.textContent = res.method === "no-wifi" ? "Wi-Fi is off." : "No camera found. Is it on its Wi-Fi waiting screen (Remote Shooting & View, Via Network) and on the same Wi-Fi as this phone?"; return; }
     for (const c of res.cameras) {
       const b = document.createElement("button"); b.className = "btn found";
@@ -1477,7 +1469,7 @@ $("findBtn").onclick = async () => {
 };
 async function fillJoin() {
   $("joinIn").checked = store.get("joinHot", false); $("joinBox").hidden = !$("joinIn").checked;
-  try { const w = await Native.getCameraWifi(); $("ssidIn").value = w.ssid || "ZS100-"; $("pwIn").value = ""; $("pwIn").placeholder = w.hasPassword ? "Saved (type to change)" : "From the camera screen"; } catch {}
+  try { const w = await Native.getCameraWifi(); $("ssidIn").value = w.ssid || drv.driver.hotspot?.ssidPrefix || ""; $("pwIn").value = ""; $("pwIn").placeholder = w.hasPassword ? "Saved (type to change)" : "From the camera screen"; } catch {}
   $("joinOut").textContent = cam.joinMsg || "";
 }
 $("joinIn").onchange = () => {
@@ -1507,34 +1499,48 @@ function fillAbout(cinfo) {
   const rows = [["Lumix app", aboutInfo ? `${aboutInfo.versionName} (${aboutInfo.versionCode})` : ""],
     ["Phone", aboutInfo ? `${aboutInfo.device}, Android ${aboutInfo.sdk}` : ""],
     ["Saving to", curFolder().replace(/\/$/, "")],
-    ["Camera", cinfo?.name ? `${cinfo.model || "Lumix"} (${cinfo.name})` : cam.online ? "ZS100" : "Not connected"],
-    ["Camera firmware", cinfo?.firmware || (cam.online ? "" : "")], ["Camera address", cam.online ? cam.ip : ""], ["Battery", cam.online ? cam.batt : ""]];
+    ["Camera", cinfo?.friendlyName ? `${cinfo.modelNumber || cinfo.capabilityModel || camLabel()} (${cinfo.friendlyName})` : cam.online ? cinfo?.capabilityModel || camLabel() : "Not connected"],
+    ["Camera firmware", cinfo?.firmware || ""], ["Camera address", cam.online ? cam.ip : ""], ["Battery", cam.online ? cam.batt : ""]];
   for (const [k, v] of rows) { if (!v) continue; const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = k; dd.textContent = v; dl.append(dt, dd); }
 }
-async function loadAbout() {
-  await refreshNight(); fillAbout();
-  if (cam.online && !sync.running) { try { const ci = await Native.cameraInfo({ ip: cam.ip }); if (ci.name || ci.model) fillAbout(lastCamInfo = ci); } catch {} }
+async function loadAbout() { await refreshNight(); fillAbout(lastCamInfo = camInfo); }
+// Settings > Camera support: which driver runs the camera, and what it allows.
+const FEATURE_NAMES = { remote: "remote shooting", liveView: "live view", video: "video", touchFocus: "tap to focus" };
+function fillDriver() {
+  const d = drv.driver, dl = $("drvList"); dl.replaceChildren();
+  const can = Object.entries(FEATURE_NAMES).filter(([k]) => d.features[k]).map(([, v]) => v);
+  if (d.features.zoom && d.features.zoom !== "none") can.push("zoom");
+  const rows = [["Driver", drv.matched ? `${d.name} (v${d.version})` : `${d.name}, cautious mode`],
+    ["Recognised by", drv.matched ? { modelNumber: "model number", capabilityModel: "model name", friendlyName: "camera name" }[drv.by] || "" : ""],
+    ["Works", ["gallery", "saving", ...can].join(", ")], ["Tested on", d.verified ? `firmware ${d.verified.firmware}, ${d.verified.date}` : ""]];
+  for (const [k, v] of rows) { if (!v) continue; const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = k; dd.textContent = v; dl.append(dt, dd); }
+  $("drvNote").textContent = drv.matched ? "" : identified ? "This camera isn't known to the app yet, so only the gallery and saving are on." : "Connect the camera to see which driver it uses.";
+  $("drvNote").hidden = !$("drvNote").textContent;
+}
+// Show only what this camera's driver supports.
+function applyFeatures() {
+  if (!feat("video") && remote.mode === "video" && !remote.recording) setRemoteMode("photo");
+  $("rmMode").hidden = !feat("video");
+  $("zoomW").parentElement.style.visibility = feat("zoom") && feat("zoom") !== "none" ? "" : "hidden";
+  const hs = hotspotIps();
+  $("ipNote").textContent = "The app finds the camera on its own, also when your router gives it a new address. You only need this to force one." +
+    (drv.driver.hotspot ? ` On the camera's own Wi-Fi it's always ${drv.driver.hotspot.ip}.` : "");
+  $("joinIn").closest("label").hidden = !hs.length;
+  if ($("settings").open) { fillDriver(); fillAbout(lastCamInfo = camInfo); }
+  renderStatus();
 }
 $("settingsBtn").onclick = () => {
   $("ipIn").value = store.get("homeIp", "10.0.0.220");
   $("parIn").value = String(store.get("parallel", 1)); $("autoIn").checked = store.get("autoSave", false);
-  fillFolder(); fillJoin(); camStat(); $("findOut").replaceChildren(); applyTheme(); fillLocation();
+  fillFolder(); fillJoin(); camStat(); $("findOut").replaceChildren(); applyTheme(); fillLocation(); fillDriver();
   $("settings").showModal(); $("settings").querySelector(".sheet-body").scrollTop = 0;
   loadAbout();
 };
 $("setBack").onclick = () => $("settings").close();
 document.addEventListener("visibilitychange", () => { if (document.hidden && remote.open) closeRemote(); if (!document.hidden) { refreshNight(); Native.bindWifi().catch(() => {}); refreshSaved(); Native.queueState().then(applyQueue).catch(() => {}); } });
 
-// ---- remote shooting: the camera goes to recmode, live view arrives by UDP (native startLiveView), commands go over HTTP
-let camChain = Promise.resolve();
-function camCmd(q, timeout = 6000) {   // one command at a time: the camera garbles overlapping requests
-  const go = () => httpGet(`http://${cam.ip}/cam.cgi?${q}`, timeout);
-  const p = camChain.then(go, go);
-  camChain = p.catch(() => {});
-  return p;
-}
-const replyOk = (b) => /<result>ok<\/result>/.test(b);
-const replyErr = (b) => (/<result>([^<]*)<\/result>/.exec(b) || [])[1] || String(b).trim().slice(0, 60);
+// ---- remote shooting (features.remote): the camera goes to its rec mode, live view arrives by UDP (native startLiveView),
+// commands go through the runtime's remote.* (one at a time: the camera garbles overlapping requests)
 function remoteInfo() {
   const bits = [];
   if (cam.batt) bits.push(`battery ${cam.batt}`);
@@ -1551,7 +1557,7 @@ function setRemoteMode(m) {
   sh.setAttribute("aria-label", remote.recording ? "Stop recording" : m === "video" ? "Start recording" : "Take photo");
 }
 async function openRemote() {
-  if (remote.open || remote.closing || !cam.online || sync.running) return;
+  if (remote.open || remote.closing || !cam.online || sync.running || !feat("remote")) return;
   if (browsing) { toast("Still loading the photo list. Try again in a moment."); return; }   // a listing running at the same time stalls the live view
   Object.assign(remote, { open: true, closing: false, recording: false, shots: 0, frames: 0, busy: false });
   setRemoteMode("photo");
@@ -1560,16 +1566,14 @@ async function openRemote() {
   $("rmShutter").disabled = false;
   Native.stopDates().catch(() => {});
   renderStatus();
+  const c = camAt(cam.ip), rec = c.driver.control.modes.rec.value;
   try {
-    const r = await camCmd("mode=camcmd&value=recmode", 8000);
-    if (!replyOk(r)) throw new Error(`The camera wouldn't switch to shooting (${replyErr(r)})`);
-    for (let i = 0; i < 8 && remote.open; i++) {   // the mode change takes a moment
-      const st = await camCmd("mode=getstate", 3000);
-      if (/<cammode>rec<\/cammode>/.test(st)) break;
-      await sleep(400);
-    }
+    const lv = feat("liveView") ? c.slice("liveView") : null;
+    await c.remote.start(lv?.port);   // rec mode (waits for it), then the stream
+    if (c.lastState?.mode !== rec) throw new Error(`The camera wouldn't switch to shooting (it's in ${c.lastState?.mode || "?"} mode)`);
     if (!remote.open) return;
-    await Native.startLiveView({ camIp: cam.ip, port: 49199 });
+    if (!lv) { $("rmMsg").textContent = "This camera sends no live picture. You can still take photos."; return; }
+    await Native.startLiveView({ ...lv, started: true });
     if (!remote.open) { Native.stopLiveView().catch(() => {}); return; }
     const mine = remote.session = (remote.session || 0) + 1;
     setTimeout(() => {
@@ -1591,14 +1595,15 @@ async function closeRemote() {
   clearInterval(remoteTimer); $("rmRec").hidden = true;
   zoomStops.forEach((f) => f());
   try { await Native.stopLiveView(); } catch {}
+  const c = camAt(cam.ip);
   try {
-    if (remote.recording) { remote.recording = false; await camCmd("mode=camcmd&value=video_recstop", 8000).catch(() => {}); }
-    await camCmd("mode=stopstream", 4000).catch(() => {});
-    for (let i = 0; i < 3; i++) {   // always leave the camera in playback mode
-      await camCmd("mode=camcmd&value=playmode", 8000).catch(() => {});
+    if (remote.recording) { remote.recording = false; await c.remote.videoStop().catch(() => {}); }
+    await c.remote.stop().catch(() => {});   // stream off, media mode
+    for (let i = 0; i < 3; i++) {   // always leave the camera in its media mode
       await sleep(700);
-      const st = await camCmd("mode=getstate", 3000).catch(() => "");
-      if (!/<cammode>rec<\/cammode>/.test(st)) break;
+      const st = await c.state().catch(() => null);
+      if (!st || st.mode !== c.driver.control.modes.rec.value) break;
+      await c.ensureMedia(st).catch(() => {});
     }
   } catch {}
   remote.closing = false;
@@ -1607,12 +1612,12 @@ async function closeRemote() {
   else { pumpThumbs(); startDates(); }
 }
 const zoomStops = [];
-function holdZoom(btn, cmd) {   // W / T: zoom while held, zoomstop on release
+function holdZoom(btn, dir) {   // W / T: zoom while held, stop on release
   let on = false;
   const stop = () => {
     if (!on) return;
     on = false; btn.classList.remove("held");
-    const go = (n) => camCmd("mode=camcmd&value=zoomstop", 4000).catch(() => { if (n > 0) go(n - 1); });   // the camera sometimes stalls a request; a lost stop would leave the lens moving
+    const go = (n) => camAt(cam.ip).remote.zoom("stop").catch(() => { if (n > 0) go(n - 1); });   // the camera sometimes stalls a request; a lost stop would leave the lens moving
     go(2);
   };
   zoomStops.push(stop);
@@ -1620,15 +1625,15 @@ function holdZoom(btn, cmd) {   // W / T: zoom while held, zoomstop on release
     if (!remote.open || on) return;
     on = true; btn.classList.add("held");
     try { btn.setPointerCapture(e.pointerId); } catch {}
-    camCmd(`mode=camcmd&value=${cmd}`).catch(() => {});
+    camAt(cam.ip).remote.zoom(dir).catch(() => {});
   });
   for (const ev of ["pointerup", "pointercancel", "lostpointercapture"]) btn.addEventListener(ev, stop);
   btn.addEventListener("contextmenu", (e) => e.preventDefault());
 }
-holdZoom($("zoomW"), "wide-normal");
-holdZoom($("zoomT"), "tele-normal");
-$("rmStage").addEventListener("click", (e) => {   // tap to focus; the camera takes 0-1000 coordinates of the picture
-  if (!remote.open || !remote.frames) return;
+holdZoom($("zoomW"), "wide");
+holdZoom($("zoomT"), "tele");
+$("rmStage").addEventListener("click", (e) => {   // tap to focus; the runtime scales 0..1 to the camera's coordinates
+  if (!remote.open || !remote.frames || !feat("touchFocus")) return;
   const img = $("lvImg"), r = img.getBoundingClientRect(), nw = img.naturalWidth || 4, nh = img.naturalHeight || 3;
   const sc = Math.min(r.width / nw, r.height / nh), w = nw * sc, h = nh * sc;
   const fx = (e.clientX - (r.left + (r.width - w) / 2)) / w, fy = (e.clientY - (r.top + (r.height - h) / 2)) / h;
@@ -1636,7 +1641,7 @@ $("rmStage").addEventListener("click", (e) => {   // tap to focus; the camera ta
   const sr = $("rmStage").getBoundingClientRect(), f = $("rmFocus");
   f.style.left = (e.clientX - sr.left) + "px"; f.style.top = (e.clientY - sr.top) + "px";
   f.classList.remove("show"); void f.offsetWidth; f.classList.add("show");
-  camCmd(`mode=camctrl&type=touch&value=${Math.round(fx * 1000)}/${Math.round(fy * 1000)}&value2=on`).catch(() => {});
+  camAt(cam.ip).remote.focus(fx, fy).catch(() => {});
 });
 function flashScreen() { const f = $("rmFlash"); f.classList.remove("show"); void f.offsetWidth; f.classList.add("show"); }
 function recTick() { const s = Math.floor((Date.now() - remote.recStart) / 1000); $("rmRec").textContent = fmtDur(s); }
@@ -1646,24 +1651,21 @@ $("rmShutter").onclick = async () => {
   try {
     if (remote.mode === "video") {
       if (!remote.recording) {
-        const r = await camCmd("mode=camcmd&value=video_recstart", 8000);
-        if (!replyOk(r)) throw new Error(replyErr(r));
+        await camAt(cam.ip).remote.videoStart();
         remote.recording = true; remote.recStart = Date.now();
         $("rmRec").hidden = false; recTick(); remoteTimer = setInterval(recTick, 500);
       } else {
-        const r = await camCmd("mode=camcmd&value=video_recstop", 8000);
         remote.recording = false; clearInterval(remoteTimer); $("rmRec").hidden = true;
-        if (!replyOk(r)) throw new Error(replyErr(r));
+        await camAt(cam.ip).remote.videoStop();
         remote.shots++; toast("Video recorded on the camera");
       }
       setRemoteMode("video");
     } else {
-      const r = await camCmd("mode=camcmd&value=capture", 12000);   // focusing and exposing take a moment
-      if (!replyOk(r)) throw new Error(replyErr(r));
+      await camAt(cam.ip).remote.capture();
       remote.shots++; flashScreen(); toast("Photo taken");
     }
   } catch (e) {
-    toast("Couldn't do that: " + String(e.message || e).replace(/^Error: /, ""));
+    toast("Couldn't do that: " + String(e.message || e).replace(/^Error: /, "").replace(/^The camera answered /, "the camera said "));
   } finally {
     remote.busy = false; $("rmShutter").disabled = false; renderStatus();
   }
@@ -1714,7 +1716,8 @@ if (!Native) {
   document.querySelector("main").innerHTML = '<p class="empty">This page only works inside the Lumix Android app.</p>';
 } else {
   setHdr(); render(); refreshSaved(); refreshNight();
-  Native.queueState().then(applyQueue).catch(() => {}).finally(loop);
+  loadRuntime().then(() => { initDriver(); applyFeatures(); return Native.queueState().then(applyQueue).catch(() => {}); })
+    .then(loop, (e) => { cam.error = `The app's camera code didn't load (${e.message || e}). Reinstall the app.`; renderStatus(); });
 }
 </script>
 </body>

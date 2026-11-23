@@ -209,20 +209,32 @@ class Camera:
     def slice(self, name: str) -> dict:
         """Slices of the driver for native code / helpers. URLs are built and guard-checked here."""
         d, c = self.driver, self.driver["control"]
+
+        def checked(o):
+            for v in o.values():
+                if isinstance(v, str) and v.startswith(("http:", "https:")):
+                    guard(v)
+                elif isinstance(v, dict):
+                    checked(v)
+            return o
+
         if name == "save":
-            return {"keepaliveUrl": self.control_url(c["state"]["query"]), "keepaliveMs": c["keepaliveMs"],
-                    "mediaMode": {"value": c["modes"]["media"]["value"], "url": self.control_url(c["modes"]["media"]["query"]),
-                                  "modeTag": c["state"]["modeTag"], "settleMs": c["settleMs"]},
-                    "pairUrl": self.control_url(_fill(c["pair"]["query"], appId=self.app_id, appName=self.app_name)),
-                    "busy": c["busy"], "dateHeader": d["media"]["dateHeader"], "slots": d["media"]["slots"], "range": d["media"]["range"]}
+            return checked({"keepaliveUrl": self.control_url(c["state"]["query"]), "keepaliveMs": c["keepaliveMs"],
+                            "mediaMode": {"value": c["modes"]["media"]["value"], "url": self.control_url(c["modes"]["media"]["query"]),
+                                          "modeTag": c["state"]["modeTag"], "settleMs": c["settleMs"]},
+                            "pairUrl": self.control_url(_fill(c["pair"]["query"], appId=self.app_id, appName=self.app_name)),
+                            "pairOkPrefix": c["pair"]["okPrefix"],
+                            "okMatch": f'<{c["state"]["resultTag"]}>{c["state"]["okValue"]}</{c["state"]["resultTag"]}>',
+                            "busy": c["busy"], "busyStatus": c["busyStatus"],
+                            "dateHeader": d["media"]["dateHeader"], "slots": d["media"]["slots"], "range": d["media"]["range"]})
         if name == "discover":
             return discover_slice(d)
         if name == "liveView":
             if not d["features"]["liveView"]:
                 raise Unsupported("live view")
             lv = d["remote"]["liveView"]
-            return {"port": lv["port"], "startUrl": self.control_url(_fill(lv["start"], port=lv["port"])),
-                    "stopUrl": self.control_url(lv["stop"]), "jpegScan": lv["jpegScan"]}
+            return checked({"port": lv["port"], "startUrl": self.control_url(_fill(lv["start"], port=lv["port"])),
+                            "stopUrl": self.control_url(lv["stop"]), "jpegScan": lv["jpegScan"]})
         raise ValueError(f'Unknown slice "{name}"')
 
 

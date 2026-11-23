@@ -92,7 +92,8 @@ test("e2e: zs100 against fakecam", async () => {
     assert.match(part.headers["content-range"], new RegExp(`^bytes 1000-\\d+/${items[0].size}$`));
     assert.equal(cam.dateFromHeaders(part.headers), "2026-11-01T13:59:00");
 
-    like(cam.slice("save"), { keepaliveUrl: `http://${IP}:${fc.port}/cam.cgi?mode=getstate`, dateHeader: "X-REC_DATE_TIME", slots: 2 });
+    like(cam.slice("save"), { keepaliveUrl: `http://${IP}:${fc.port}/cam.cgi?mode=getstate`, dateHeader: "X-REC_DATE_TIME", slots: 2,
+      okMatch: "<result>ok</result>", pairOkPrefix: "ok", mediaMode: { value: "play", modeTag: "cammode" } });
     like(cam.slice("liveView"), { port: 49199, stopUrl: `http://${IP}:${fc.port}/cam.cgi?mode=stopstream` });
     like(lux.discoverSlice(zs100), { probe: { query: "mode=getstate", busyPort: 60606 }, hotspot: { ip: "192.168.54.1" } });
 
@@ -125,4 +126,12 @@ test("e2e: a camera held by another app is busy", async () => {
     assert.equal(await cam.probe(), "busy");
     await assert.rejects(cam.state(), lux.Busy);
   } finally { fc.stop(); }
+});
+
+test("slices for native code are guard-checked", () => {
+  const bad = lux.resolveDriver("evil", { ...drivers, evil: { id: "evil", schema: 1, extends: "panasonic-zs100",
+    control: { modes: { media: { query: "mode=delete_all" } } }, remote: { liveView: { stop: "mode=format" } } } });
+  const cam = new lux.Camera(bad, "10.0.0.1", { transport: {} });
+  assert.throws(() => cam.slice("save"), lux.Refused);
+  assert.throws(() => cam.slice("liveView"), lux.Refused);
 });

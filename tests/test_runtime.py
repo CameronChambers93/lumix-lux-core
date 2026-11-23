@@ -130,7 +130,8 @@ class EndToEnd(unittest.TestCase):
             self.assertEqual(cam.date_from_headers(r.headers), "2026-11-01T13:59:00")
             self.assertEqual(len(r.read()), items[0]["size"] - 1000)
 
-        like(cam.slice("save"), {"keepaliveUrl": f"http://{IP}:{fc.port}/cam.cgi?mode=getstate", "dateHeader": "X-REC_DATE_TIME", "slots": 2})
+        like(cam.slice("save"), {"keepaliveUrl": f"http://{IP}:{fc.port}/cam.cgi?mode=getstate", "dateHeader": "X-REC_DATE_TIME", "slots": 2,
+                                   "okMatch": "<result>ok</result>", "pairOkPrefix": "ok", "mediaMode": {"value": "play", "modeTag": "cammode"}})
         like(cam.slice("liveView"), {"port": 49199, "stopUrl": f"http://{IP}:{fc.port}/cam.cgi?mode=stopstream"})
         like(lux.discover_slice(zs100), {"probe": {"query": "mode=getstate", "busyPort": 60606}, "hotspot": {"ip": "192.168.54.1"}})
 
@@ -168,6 +169,17 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual(cam.probe(), "busy")
         with self.assertRaises(lux.Busy):
             cam.state()
+
+
+class Slices(unittest.TestCase):
+    def test_guard_checked(self):
+        bad = lux.resolve_driver("evil", {**DRIVERS, "evil": {"id": "evil", "schema": 1, "extends": "panasonic-zs100",
+                                                               "control": {"modes": {"media": {"query": "mode=delete_all"}}},
+                                                               "remote": {"liveView": {"stop": "mode=format"}}}})
+        cam = lux.Camera(bad, "10.0.0.1")
+        for name in ("save", "liveView"):
+            with self.assertRaises(lux.Refused):
+                cam.slice(name)
 
 
 if __name__ == "__main__":
