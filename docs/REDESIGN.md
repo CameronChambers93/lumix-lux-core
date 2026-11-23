@@ -223,3 +223,29 @@ or the address is typed), or with the share sheet (email, Drive) when the PC isn
   `panasonic-zs100` by `modelNumber`, playmode switch from rec, all 223 dates filled, thumbnail + preview, EXIF from the camera's
   first 128 KB, sync of a photo and a 16 MB video, Range on `/media`. Pages checked in headless Chromium (light/dark, phone width).
 - Not covered by fakecam: camera-side EXIF (`FAKE_PHOTO` is ignored in `--driver` mode); verified on the real camera instead.
+
+### Phase 3: Android onto core (2026-11-23)
+
+- `ui/index.html` has no protocol strings any more: connection, pairing, media mode, listing, Remote (`remote.start/stop/capture/
+  videoStart/videoStop/zoom/focus`) go through `js/lux-camera.js` with `Native.httpGet/httpPost` as the transport. On connect it
+  identifies the camera (new native `ssdpLocate` → device description, plus `getinfo` capability) and `matchDriver` picks the driver,
+  remembered in localStorage (`driverId`) so the UI fits before the camera answers; an empty identification keeps the old driver.
+  The UI follows `features`: no Remote button in cautious mode, Video/zoom/tap-to-focus/date lookups only when the driver has them;
+  labels ("ZS100 · battery", About) and hotspot addresses/SSID prefix come from drivers. Settings → **Camera support** shows the
+  driver, how it was recognised, what works and the `verified` firmware.
+- Native is camera-agnostic: `enqueue({driver: slice("save")})` (SaveQueue keepalive, re-pair, media mode, Range all from the slice),
+  `discover({ssdp, probe, hotspots})` from `discoverSlice(base)`, `startLiveView(slice("liveView") + started)`,
+  `camDates/camThumb/exifRemote({header, range})`; `cameraInfo` replaced by `ssdpLocate`; `httpGet/httpPost` return lower-case
+  `headers`. New `Guard.java` applies the runtimes' denylist to every camera request native code sends (all 17 `guard.json`
+  cases pass in plain Java). Runtimes: the save slice gained `okMatch`, `pairOkPrefix`, `busyStatus`, and slice URLs are now
+  really guard-checked (new test in both suites: a driver with `delete`/`format` queries can't produce a slice).
+- Android `build.sh` copies `core/js` and `core/drivers` into `www/` and writes `www/drivers/index.json`; v3.0 (versionCode 13).
+  `LumixNativePlugin.java` normalised to LF in a separate commit (it predated `.gitattributes`).
+- Tested: core JS 43 / Python suites pass; the APK builds. The built `www/` page in headless Chromium with a mock plugin proxying
+  to `fakecam.py --driver` (ZS100 and an unknown "GH5" in cautious mode): connect, match by `modelNumber`, 60-item listing, dates
+  from the header, day headers, enqueue gets the save slice (parallel clamped to `slots`), discovery after a wrong address gets the
+  family slice and reconnects, Remote sends recmode/startstream slice/capture/tele+zoomstop/touch/video start+stop/stopstream and ends
+  in play; cautious mode hides Remote and refuses it; nothing denied, no page errors; Settings checked in light and dark.
+- **Not done yet:** the `TESTING.md` checklist on the emulator against the real ZS100 (neither the emulator nor the camera was up),
+  so the native changes (SaveQueue slice, discover/ssdpLocate, live view from the slice, date header) are compiled but not run.
+  Run items 1-26 before releasing v3.0. The Windows app's `core/` bump isn't needed for this phase (only the save slice changed).

@@ -1505,11 +1505,11 @@ function fillAbout(cinfo) {
 }
 async function loadAbout() { await refreshNight(); fillAbout(lastCamInfo = camInfo); }
 // Settings > Camera support: which driver runs the camera, and what it allows.
-const FEATURE_NAMES = { remote: "remote shooting", liveView: "live view", video: "video", touchFocus: "tap to focus" };
+const FEATURE_NAMES = { remote: "remote shooting", liveView: "live view", video: "video recording", touchFocus: "tap to focus" };
 function fillDriver() {
   const d = drv.driver, dl = $("drvList"); dl.replaceChildren();
-  const can = Object.entries(FEATURE_NAMES).filter(([k]) => d.features[k]).map(([, v]) => v);
-  if (d.features.zoom && d.features.zoom !== "none") can.push("zoom");
+  const can = d.features.remote ? Object.entries(FEATURE_NAMES).filter(([k]) => d.features[k]).map(([, v]) => v) : [];   // all Remote features
+  if (d.features.remote && d.features.zoom && d.features.zoom !== "none") can.push("zoom");
   const rows = [["Driver", drv.matched ? `${d.name} (v${d.version})` : `${d.name}, cautious mode`],
     ["Recognised by", drv.matched ? { modelNumber: "model number", capabilityModel: "model name", friendlyName: "camera name" }[drv.by] || "" : ""],
     ["Works", ["gallery", "saving", ...can].join(", ")], ["Tested on", d.verified ? `firmware ${d.verified.firmware}, ${d.verified.date}` : ""]];
